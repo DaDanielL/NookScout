@@ -1,0 +1,21 @@
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# Node / frontend
+node_modules/
+dist/
+coverage/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
