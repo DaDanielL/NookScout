@@ -1,0 +1,15 @@
+{
+  "request_id": "fixture-ticker-overview-aapl",
+  "status": "OK",
+  "results": {
+    "active": true,
+    "market": "stocks",
+    "market_cap": 2900000000000,
+    "name": "Apple Inc.",
+    "primary_exchange": "XNAS",
+    "ticker": "AAPL",
+    "type": "CS",
+    "currency_name": "usd",
+    "last_updated_utc": "2026-05-08T20:00:00Z"
+  }
+}

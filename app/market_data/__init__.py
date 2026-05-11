@@ -9,6 +9,7 @@ from app.market_data.base import (
     ProviderUnavailableError,
     SymbolNotFoundError,
 )
+from app.market_data.massive import MassiveMarketDataProvider
 from app.market_data.schemas import (
     AssetType,
     DailyCandle,
@@ -25,6 +26,7 @@ __all__ = [
     "IncompleteMarketDataError",
     "MarketDataError",
     "MarketDataProvider",
+    "MassiveMarketDataProvider",
     "ProviderAuthenticationError",
     "ProviderCapabilities",
     "ProviderRateLimitError",
