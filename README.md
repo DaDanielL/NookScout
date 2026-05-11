@@ -57,6 +57,10 @@ The response includes non-secret operational metadata such as status, app name, 
 
 The MVP provider decision is documented in [docs/market-data-providers.md](docs/market-data-providers.md). Provider access must go through future adapters under `app/market_data/`; scoring, indicators, persistence, and UI code should not call provider APIs directly.
 
+Recommendation-impacting rules, including liquidity filtering and future setup scoring
+methodology, are documented in
+[docs/scoring-methodology.md](docs/scoring-methodology.md).
+
 ## AI Workflow
 
 Project planning and implementation artifacts live under `.agents/`. Start with [.agents/README.md](.agents/README.md) for the Codex workflow layer.
