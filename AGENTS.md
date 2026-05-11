@@ -266,7 +266,7 @@ For UI changes, verify the dashboard in a browser and capture screenshots when p
 - **Issue inspection**: Use `gh issue view {number}` before planning linked work.
 - **Labels**: use consistent labels: `data`, `scoring`, `llm`, `frontend`, `charts`, `storage`, `api`, `tests`, `docs`, `compliance`.
 - **Issue size**: prefer small vertical slices that can be implemented and validated independently.
-- **Branches**: `feature/{issue-number}-{short-slug}`, `fix/{issue-number}-{short-slug}`, or `docs/{issue-number}-{short-slug}`.
+- **Branches**: `feature-{issue-number}-{short-slug}`, `fix-{issue-number}-{short-slug}`, or `docs-{issue-number}-{short-slug}`.
 - **Pull requests**: Use `gh pr create` for PRs and `gh pr view` to inspect PR context.
 - **PR expectation**: include summary, linked issue, validation commands run, screenshots or recordings for UI changes, and notes on provider or LLM behavior when relevant.
 - **PR blockers**: formatting, linting, type checking, unit tests, integration tests, scoring fixture tests, and frontend build where applicable.
