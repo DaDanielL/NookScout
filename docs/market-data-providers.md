@@ -4,6 +4,10 @@ Research date: 2026-05-07
 
 This note records the MVP market data provider decision for STORY-001. NookScout should consume provider data only through future adapters under `app/market_data/`; scoring, indicators, charts, and UI code should never call a provider API directly.
 
+Provider choice, licensing, freshness, and adapter constraints are documented here. Rules
+that determine whether provider data makes a ticker eligible or ineligible for NookScout
+research output are documented in [scoring-methodology.md](scoring-methodology.md).
+
 ## MVP Recommendation
 
 Use **Massive Stocks Starter** for the MVP.
@@ -71,7 +75,7 @@ MASSIVE_MAX_RETRIES=3
 
 - STORY-003 should define provider-neutral schemas for quotes/snapshots, daily candles, reference data, provider capabilities, and data recency.
 - STORY-004 should implement the concrete adapter as `app/market_data/massive.py` or another name chosen by local conventions after scaffold.
-- STORY-005 should use reference metadata, snapshot prices, average volume, dollar volume, exchange/listing type, and market cap to implement configurable liquidity rules.
+- STORY-005 should use reference metadata, snapshot prices, average volume, dollar volume, exchange/listing type, and market cap to implement configurable liquidity rules. Keep the exact recommendation-impacting rule definitions in [scoring-methodology.md](scoring-methodology.md).
 - Default tests should use mocked provider responses and fixtures. Do not perform live provider calls in normal local or CI validation.
 - Provider errors should map to typed unavailable, unauthorized, rate-limited, missing-symbol, and incomplete-data states once product code exists.
 

@@ -32,6 +32,13 @@ def test_settings() -> Settings:
         massive_data_recency="delayed",
         massive_request_timeout_seconds=30,
         massive_max_retries=3,
+        predefined_universe_symbols=(),
+        liquidity_min_price="5",
+        liquidity_min_average_daily_volume=1_000_000,
+        liquidity_min_dollar_volume="20000000",
+        liquidity_min_market_cap="1000000000",
+        liquidity_allowed_exchanges=("XNAS", "XNYS", "NASDAQ", "NYSE"),
+        liquidity_average_volume_lookback_days=90,
     )
 
 
