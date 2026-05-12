@@ -1,6 +1,6 @@
 # Scoring Methodology
 
-Last updated: 2026-05-11
+Last updated: 2026-05-12
 
 This document is the canonical MVP reference for rules that determine which tickers and
 future setup ideas NookScout surfaces or suppresses. It documents educational research
@@ -15,7 +15,16 @@ Implemented by STORY-005:
 - Configurable liquidity filters for Scout Mode universe eligibility.
 - Provider-neutral eligible and ineligible universe results with exclusion reasons.
 
-Planned, not implemented in STORY-005:
+Decided by STORY-007:
+
+- NookScout owns MVP indicator calculations internally from normalized and cached market
+  data.
+- Provider-precomputed indicators are not the scoring source of truth for MVP setup
+  discovery.
+- Future provider indicator use is limited to documented reference/comparison behavior
+  or explicitly approved fallback behavior in a future PRD update.
+
+Planned, not implemented:
 
 - Technical indicator calculations.
 - Trend and setup classification.
@@ -100,18 +109,81 @@ Provider choice, licensing, freshness, and hosted-distribution constraints remai
 [market-data-providers.md](market-data-providers.md). This document owns the
 recommendation-impacting rule definitions.
 
-## Future Indicator Methodology
+## MVP Indicator Ownership Decision
 
-Planned, not implemented in STORY-005.
+STORY-007 decides that NookScout should compute MVP technical indicators internally
+from normalized market data, primarily cached adjusted daily candles, using deterministic
+pandas/NumPy calculations. Provider-precomputed indicators are not the source of truth
+for setup scoring, setup levels, risk/reward estimates, confidence factors, or LLM
+rationale inputs.
 
-Future indicator code should be deterministic and should calculate moving averages, RSI,
-MACD, ATR, relative volume, support/resistance, and relative strength from normalized
-market data. Provider indicator endpoints may be used only as a documented comparison or
-fallback if a later story explicitly approves that behavior.
+This decision preserves:
+
+- Reproducibility: the same normalized candle inputs and calculation version should
+  produce the same indicator outputs.
+- Provider portability: switching market data providers should not change formulas
+  silently.
+- Testability: indicator regressions should be caught with fixture-based expected
+  values.
+- Interpretability: old setup ideas can be understood later when persisted with their
+  indicator calculation and scoring versions.
+
+Provider indicator endpoints may be useful as manual reference data during development,
+or as future fallback behavior if a PRD update explicitly approves that change. They
+must not be mixed silently with internal indicators. Any approved future provider
+fallback must be normalized, labeled with provider and formula/source metadata, versioned,
+and excluded from deterministic scoring unless the scoring methodology is updated.
+
+## Indicator Signal Coverage
+
+The MVP indicator layer should consume provider-neutral `DailyCandle`, `Quote`, cached
+benchmark candles, and future persisted indicator snapshots. Indicator code should not
+call provider APIs directly or depend on provider-specific response shapes.
+
+| Signal | MVP owner | Primary inputs | Provider indicator policy | Follow-up implementation notes |
+|--------|-----------|----------------|---------------------------|--------------------------------|
+| Moving averages | Internal NookScout calculation | Adjusted daily closes from normalized candles | Provider moving averages are reference-only unless a future PRD approves fallback behavior | STORY-008 should compute 20, 50, and 200-day simple moving averages and return incomplete-data states when history is insufficient. |
+| RSI | Internal NookScout calculation | Adjusted daily closes from normalized candles | Provider RSI is reference-only unless a future PRD approves fallback behavior | STORY-008 should use a documented 14-period RSI method, preferably Wilder-style smoothing, and fixture tests should lock the chosen formula. |
+| MACD | Internal NookScout calculation | Adjusted daily closes from normalized candles | Provider MACD is reference-only unless a future PRD approves fallback behavior | STORY-008 should use documented MVP defaults, expected to be 12/26-period EMAs with a 9-period signal line unless implementation research records a change. |
+| ATR | Internal NookScout calculation | Normalized daily high, low, and close values | Provider ATR is reference-only unless a future PRD approves fallback behavior | STORY-008 should use a documented 14-period ATR method, preferably Wilder-style smoothing over true range, and explicitly handle gap days. |
+| Relative volume | Internal NookScout calculation | Normalized daily volume and configurable historical volume window | Provider volume indicators are reference-only unless a future PRD approves fallback behavior | STORY-008 should compare recent complete-session volume against a documented average-volume window and handle missing or zero-volume inputs explicitly. |
+| Support/resistance | Internal NookScout calculation | Normalized daily highs, lows, closes, and future scoring windows | Provider levels must not be consumed as setup levels for MVP scoring | STORY-009 should define deterministic level rules, lookbacks, tie handling, and incomplete-data behavior before scoring consumes levels. |
+| Relative strength | Internal NookScout calculation | Normalized ticker candles and cached benchmark candles for `SPY` and `QQQ` | Provider relative-strength indicators are reference-only unless a future PRD approves fallback behavior | STORY-009 should compare matched lookback returns against cached benchmark series and record benchmark symbols, windows, and missing-benchmark states. |
+
+## Indicator Fixture and Tolerance Notes
+
+Future indicator stories should add deterministic fixtures before indicator outputs are
+used by scoring. Required fixtures should include:
+
+- Known adjusted daily OHLCV series with enough history for 20/50/200 moving averages,
+  RSI, MACD, ATR, and relative volume.
+- Insufficient-history series that produce explicit incomplete-data states instead of
+  fabricated values.
+- Flat price series for momentum and volatility edge cases.
+- Volatile gap or large-range series for ATR behavior.
+- Missing or zero-volume cases for relative volume behavior.
+- Matched ticker, `SPY`, and `QQQ` benchmark series for relative strength behavior.
+- Provider-reference comparison fixtures only when provider indicators are used for
+  non-scoring comparison during development.
+
+Expected assertion policy:
+
+- Use exact assertions for metadata, calculation version strings, input windows, candle
+  counts, incomplete-data states, benchmark symbols, labels, and selected periods.
+- Use approximate assertions for floating-point indicator values, such as
+  `pytest.approx`, with documented absolute or relative tolerances per indicator family.
+- Test Decimal or rounded display values at API or presentation boundaries, not inside
+  raw pandas/NumPy calculation internals unless those internals intentionally use
+  Decimal.
+
+Future persisted indicator snapshots should record calculation version, ticker, provider
+for the source candles, input candle range, adjusted/unadjusted status, benchmark symbols
+and windows for relative strength, incomplete-data flags, and the scoring version that
+consumed the snapshot.
 
 ## Future Trend and Setup Classification
 
-Planned, not implemented in STORY-005.
+Planned, not implemented.
 
 Future setup classification should keep the MVP scope to bullish long swing-trading
 research ideas. Weak or unclear tickers should be labeled as no-clear-setup or wait states
@@ -119,7 +191,7 @@ rather than being forced into a setup category.
 
 ## Future Scoring, Ranking, and Levels
 
-Planned, not implemented in STORY-005.
+Planned, not implemented.
 
 Future scoring rules should define ranking factors, tie-breaking, confidence labels,
 no-clear-setup behavior, entry zone, invalidation area, target area, risk/reward estimate,
