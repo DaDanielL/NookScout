@@ -1,5 +1,22 @@
 """Provider-neutral technical indicator contracts and calculations."""
 
+from app.indicators.signals import (
+    BenchmarkRelativeStrength,
+    PriceLevelKind,
+    PriceLevelZone,
+    RelativeStrengthConfig,
+    RelativeStrengthIncompleteDetail,
+    RelativeStrengthIncompleteReason,
+    RelativeStrengthLabel,
+    RelativeStrengthSnapshot,
+    SupportResistanceConfig,
+    SupportResistanceIncompleteDetail,
+    SupportResistanceIncompleteReason,
+    SupportResistanceSnapshot,
+    SupportResistanceState,
+    calculate_relative_strength,
+    calculate_support_resistance,
+)
 from app.indicators.technical import (
     IndicatorConfig,
     IndicatorIncompleteDetail,
@@ -11,11 +28,26 @@ from app.indicators.technical import (
 )
 
 __all__ = [
+    "BenchmarkRelativeStrength",
     "IndicatorConfig",
     "IndicatorIncompleteDetail",
     "IndicatorIncompleteReason",
     "IndicatorPoint",
     "MacdValue",
+    "PriceLevelKind",
+    "PriceLevelZone",
+    "RelativeStrengthConfig",
+    "RelativeStrengthIncompleteDetail",
+    "RelativeStrengthIncompleteReason",
+    "RelativeStrengthLabel",
+    "RelativeStrengthSnapshot",
+    "SupportResistanceConfig",
+    "SupportResistanceIncompleteDetail",
+    "SupportResistanceIncompleteReason",
+    "SupportResistanceSnapshot",
+    "SupportResistanceState",
     "TechnicalIndicatorSnapshot",
+    "calculate_relative_strength",
+    "calculate_support_resistance",
     "calculate_technical_indicators",
 ]
