@@ -9,13 +9,14 @@ execution guidance, personalized financial advice, or a promise of any outcome.
 
 ## Current Implementation Status
 
-Implemented by STORY-005 and STORY-008:
+Implemented by STORY-005, STORY-008, and STORY-009:
 
 - Configurable predefined universe symbols.
 - Configurable liquidity filters for Scout Mode universe eligibility.
 - Provider-neutral eligible and ineligible universe results with exclusion reasons.
 - Deterministic core technical indicators from normalized completed daily candles:
   SMA, RSI, MACD, ATR, and relative volume.
+- Deterministic support/resistance zones and benchmark-relative strength signals.
 
 Decided by STORY-007:
 
@@ -28,7 +29,6 @@ Decided by STORY-007:
 
 Planned, not implemented:
 
-- Support/resistance and relative-strength calculations.
 - Trend and setup classification.
 - Setup scoring, ranking, tie-breaking, confidence labels, no-clear-setup decisions,
   entry zone, invalidation area, target area, and risk/reward estimates.
@@ -201,9 +201,127 @@ snapshot records a `zero_volume_baseline` incomplete reason. If there are no can
 snapshot records `no_candles` rather than raising. Insufficient warm-up history records
 `insufficient_history` details.
 
-Support/resistance and relative-strength calculations remain future work. Provider
-indicator endpoints may be used only as a documented comparison or fallback if a later
-story explicitly approves that behavior.
+Provider indicator endpoints may be used only as a documented comparison or fallback if a
+later story explicitly approves that behavior.
+
+### Support And Resistance Signals
+
+Support and resistance signals are calculated in `app/indicators/signals.py` from
+normalized `DailyCandle` contracts only. The indicator layer does not fetch candles,
+read provider-specific payloads, or call market-data adapters. Callers must supply
+completed daily candles from the provider-neutral market-data layer or cached
+repositories.
+
+Default support/resistance parameters are:
+
+| Parameter | Default |
+|-----------|---------|
+| Lookback window | `60` completed sessions |
+| Pivot-left confirmation | `2` prior candles |
+| Pivot-right confirmation | `2` later completed candles |
+| Zone width | `1%` around the representative level price |
+| Pullback proximity | `3%` above the support zone |
+| Breakout buffer | `0.5%` above the resistance zone |
+| Maximum levels per side | `3` support and `3` resistance zones |
+
+The minimum history needed to evaluate levels is:
+
+```text
+pivot_left + pivot_right + 1
+```
+
+The calculation sorts inputs by `session_date`, rejects mixed symbols, mixed providers,
+mixed adjusted/unadjusted basis, duplicate session dates, reused timestamps across
+different sessions, and non-finite OHLC values. It then uses the most recent
+`lookback_period` candles.
+
+A support pivot is a candle whose low is less than or equal to the lows in the configured
+number of candles before and after it. A resistance pivot is a candle whose high is
+greater than or equal to the highs in the configured number of candles before and after
+it. Because `pivot_right` requires later completed candles, the latest candles can help
+confirm historical pivots but are not treated as confirmed pivots until enough later
+completed candles exist.
+
+Nearby pivots are collapsed into simple zones by averaging the pivot prices and applying
+the configured `zone_percent` above and below the representative level. Zones are ranked
+by touch count and recency, then capped by `max_levels`. These zones are transparent MVP
+heuristics for educational setup context, not optimized trading parameters or precise
+predictions.
+
+Latest-price state is classified conservatively:
+
+- `breakout`: latest close is above a prior resistance zone high plus the configured
+  breakout buffer.
+- `pullback_near_support`: latest close is inside the nearest support zone or within
+  the configured proximity above it.
+- `failed_resistance`: latest high trades into a resistance zone, but latest close
+  finishes below that zone.
+- `between_levels`: both a nearest support and nearest resistance exist, but no stronger
+  state applies.
+- `no_clear_level`: enough data exists, but no actionable level state is identified.
+- `incomplete`: no candles or insufficient history prevent level evaluation.
+
+If enough candles are present but no confirmed swing levels are found, the snapshot
+records `no_swing_levels` rather than inventing support or resistance. STORY-009 tuning
+is limited to deterministic fixture behavior for obvious chart patterns such as
+breakouts, pullbacks near support, failed resistance, no-clear-level cases, and
+incomplete data. Broader calibration is deferred until NookScout has persisted setup
+ideas, scoring outputs, historical outcomes, and/or user feedback that can support larger
+historical sanity checks, real-example scoring regression sets, outcome review, and
+feedback-driven adjustments.
+
+### Benchmark-Relative Strength Signals
+
+Relative strength is calculated in `app/indicators/signals.py` from ticker candles plus
+caller-provided benchmark candles. Benchmark data must come through the same
+provider-neutral market-data boundary or cached `DailyCandle` repositories; the indicator
+module does not fetch `SPY`, `QQQ`, or any other benchmark directly.
+
+Default relative-strength parameters are:
+
+| Parameter | Default |
+|-----------|---------|
+| Benchmark symbols | `SPY`, `QQQ` |
+| Lookback windows | `20` completed sessions |
+| Outperformance threshold | `0.0` excess return |
+
+For each benchmark and lookback window, NookScout uses the latest ticker candle as the
+comparison end. The start date is the ticker session exactly `lookback_period` rows
+before that end session. The benchmark must have candles on both the ticker start and
+end dates; NookScout does not interpolate, forward-fill, or use nearest-neighbor dates.
+The benchmark series does not need every intervening session for this return-only
+comparison.
+
+Returns are calculated as:
+
+```text
+(end_close / start_close) - 1
+```
+
+Excess return is:
+
+```text
+ticker_return - benchmark_return
+```
+
+A comparison is labeled `outperforming` only when excess return is greater than the
+configured threshold; otherwise a complete comparison is labeled `underperforming`.
+Incomplete benchmark data is never treated as underperformance. Missing or unusable
+comparisons record explicit reasons: `no_ticker_candles`,
+`insufficient_ticker_history`, `missing_benchmark`, `insufficient_benchmark_history`,
+`no_overlapping_dates`, or `invalid_start_price`.
+
+The overall label is `incomplete` only when no comparison can be calculated. If all
+complete comparisons outperform, the overall label is `outperforming`; if all complete
+comparisons underperform, it is `underperforming`; otherwise it is `mixed`. Snapshots may
+still be marked incomplete when some benchmark comparisons are missing, even if the
+available complete comparisons share one label.
+
+Sector-relative strength remains explicitly deferred for the MVP. STORY-009 scopes
+relative strength to broad-market benchmarks, defaulting to `SPY` and `QQQ`, until a
+future story defines sector benchmark selection, data requirements, and user-facing
+interpretation.
+
 ## MVP Indicator Ownership Decision
 
 STORY-007 decides that NookScout should compute MVP technical indicators internally
@@ -242,8 +360,8 @@ call provider APIs directly or depend on provider-specific response shapes.
 | MACD | Internal NookScout calculation | Adjusted daily closes from normalized candles | Provider MACD is reference-only unless a future PRD approves fallback behavior | STORY-008 should use documented MVP defaults, expected to be 12/26-period EMAs with a 9-period signal line unless implementation research records a change. |
 | ATR | Internal NookScout calculation | Normalized daily high, low, and close values | Provider ATR is reference-only unless a future PRD approves fallback behavior | STORY-008 should use a documented 14-period ATR method, preferably Wilder-style smoothing over true range, and explicitly handle gap days. |
 | Relative volume | Internal NookScout calculation | Normalized daily volume and configurable historical volume window | Provider volume indicators are reference-only unless a future PRD approves fallback behavior | STORY-008 should compare recent complete-session volume against a documented average-volume window and handle missing or zero-volume inputs explicitly. |
-| Support/resistance | Internal NookScout calculation | Normalized daily highs, lows, closes, and future scoring windows | Provider levels must not be consumed as setup levels for MVP scoring | STORY-009 should define deterministic level rules, lookbacks, tie handling, and incomplete-data behavior before scoring consumes levels. |
-| Relative strength | Internal NookScout calculation | Normalized ticker candles and cached benchmark candles for `SPY` and `QQQ` | Provider relative-strength indicators are reference-only unless a future PRD approves fallback behavior | STORY-009 should compare matched lookback returns against cached benchmark series and record benchmark symbols, windows, and missing-benchmark states. |
+| Support/resistance | Internal NookScout calculation | Normalized daily highs, lows, closes, and future scoring windows | Provider levels must not be consumed as setup levels for MVP scoring | STORY-009 implements deterministic pivot zones, lookbacks, tie handling, and incomplete-data behavior before scoring consumes levels. |
+| Relative strength | Internal NookScout calculation | Normalized ticker candles and cached benchmark candles for `SPY` and `QQQ` | Provider relative-strength indicators are reference-only unless a future PRD approves fallback behavior | STORY-009 compares matched lookback returns against cached benchmark series and records benchmark symbols, windows, and missing-benchmark states. |
 
 ## Indicator Fixture and Tolerance Notes
 
