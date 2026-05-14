@@ -154,6 +154,59 @@ class QuoteSnapshotRecord(Base):
     created_at: Mapped[datetime] = mapped_column(AwareDateTime(), default=utc_now, nullable=False)
 
 
+class IndicatorSnapshotRecord(Base):
+    """Versioned deterministic indicator snapshot for one symbol/calculation run."""
+
+    __tablename__ = "indicator_snapshots"
+    __table_args__ = (
+        Index(
+            "ix_indicator_snapshots_symbol_provider_calculation_date",
+            "symbol",
+            "provider",
+            "calculation_date",
+        ),
+        Index(
+            "ix_indicator_snapshots_symbol_provider_version_date",
+            "symbol",
+            "provider",
+            "calculation_version",
+            "calculation_date",
+        ),
+        Index(
+            "ix_indicator_snapshots_version_calculated_at",
+            "calculation_version",
+            "calculated_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(10), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    calculation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    calculated_at: Mapped[datetime] = mapped_column(AwareDateTime(), nullable=False)
+    calculation_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    adjusted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    data_recency: Mapped[str] = mapped_column(String(30), nullable=False)
+    input_start_session_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    input_end_session_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    available_candles: Mapped[int] = mapped_column(Integer, nullable=False)
+    required_candles: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    technical_is_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    support_resistance_is_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    relative_strength_is_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    benchmark_symbols: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    relative_strength_lookback_periods: Mapped[list[int] | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    technical_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    support_resistance_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    relative_strength_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    incomplete_details: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(AwareDateTime(), default=utc_now, nullable=False)
+
+
 class IngestionRunRecord(Base):
     """Metadata for a local market-data ingestion run."""
 
@@ -193,6 +246,7 @@ class IngestionRunRecord(Base):
 
 __all__ = [
     "DailyCandleRecord",
+    "IndicatorSnapshotRecord",
     "IngestionRunRecord",
     "IngestionRunStatus",
     "IngestionRunType",

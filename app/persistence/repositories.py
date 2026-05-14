@@ -8,6 +8,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.indicators.snapshots import IndicatorSnapshotCreate
 from app.market_data.schemas import (
     DailyCandle,
     Quote,
@@ -17,6 +18,7 @@ from app.market_data.schemas import (
 )
 from app.persistence.models import (
     DailyCandleRecord,
+    IndicatorSnapshotRecord,
     IngestionRunRecord,
     IngestionRunStatus,
     QuoteSnapshotRecord,
@@ -165,6 +167,39 @@ class DailyCandleRepository:
         records = self._session.scalars(statement).all()
         return tuple(_daily_candle_from_record(record) for record in records)
 
+    def get_recent(
+        self,
+        symbol: str,
+        *,
+        limit: int,
+        provider: str | None = None,
+        adjusted: bool = True,
+        end_date: date | None = None,
+    ) -> tuple[DailyCandle, ...]:
+        """Return the most recent cached daily candles in ascending date order."""
+        if limit <= 0:
+            raise PersistenceError("limit must be greater than 0")
+
+        statement = (
+            select(DailyCandleRecord)
+            .where(
+                DailyCandleRecord.symbol == normalize_symbol(symbol),
+                DailyCandleRecord.adjusted == adjusted,
+            )
+            .order_by(DailyCandleRecord.session_date.desc(), DailyCandleRecord.id.desc())
+            .limit(limit)
+        )
+        if provider is not None:
+            statement = statement.where(
+                DailyCandleRecord.provider == _normalize_text(provider, "provider")
+            )
+        if end_date is not None:
+            statement = statement.where(DailyCandleRecord.session_date <= end_date)
+
+        records = self._session.scalars(statement).all()
+        ordered_records = sorted(records, key=lambda record: (record.session_date, record.id))
+        return tuple(_daily_candle_from_record(record) for record in ordered_records)
+
 
 class QuoteSnapshotRepository:
     """Persist and read normalized quote snapshots."""
@@ -231,6 +266,95 @@ class QuoteSnapshotRepository:
         if record is None:
             return None
         return _quote_from_record(record)
+
+
+class IndicatorSnapshotRepository:
+    """Persist and read versioned deterministic indicator snapshots."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(self, snapshot: IndicatorSnapshotCreate) -> IndicatorSnapshotRecord:
+        """Insert a new immutable indicator snapshot record."""
+        record = IndicatorSnapshotRecord(
+            symbol=snapshot.symbol,
+            provider=snapshot.provider,
+            calculation_date=snapshot.calculation_date,
+            calculated_at=snapshot.calculated_at,
+            calculation_version=snapshot.calculation_version,
+            adjusted=snapshot.adjusted,
+            data_recency=snapshot.data_recency.value,
+            input_start_session_date=snapshot.input_start_session_date,
+            input_end_session_date=snapshot.input_end_session_date,
+            available_candles=snapshot.available_candles,
+            required_candles=snapshot.required_candles,
+            is_complete=snapshot.is_complete,
+            technical_is_complete=snapshot.technical_is_complete,
+            support_resistance_is_complete=snapshot.support_resistance_is_complete,
+            relative_strength_is_complete=snapshot.relative_strength_is_complete,
+            benchmark_symbols=list(snapshot.benchmark_symbols) or None,
+            relative_strength_lookback_periods=(
+                list(snapshot.relative_strength_lookback_periods) or None
+            ),
+            technical_snapshot=snapshot.technical_snapshot.model_dump(mode="json"),
+            support_resistance_snapshot=snapshot.support_resistance_snapshot.model_dump(
+                mode="json"
+            ),
+            relative_strength_snapshot=snapshot.relative_strength_snapshot.model_dump(mode="json"),
+            incomplete_details=[
+                detail.model_dump(mode="json") for detail in snapshot.incomplete_details
+            ],
+        )
+        self._session.add(record)
+        self._session.flush()
+        return record
+
+    def get_latest(
+        self,
+        symbol: str,
+        *,
+        provider: str | None = None,
+        adjusted: bool | None = True,
+        calculation_version: str | None = None,
+    ) -> IndicatorSnapshotRecord | None:
+        """Return the latest indicator snapshot, or None on cache miss."""
+        statement = select(IndicatorSnapshotRecord).where(
+            IndicatorSnapshotRecord.symbol == normalize_symbol(symbol)
+        )
+        if provider is not None:
+            statement = statement.where(
+                IndicatorSnapshotRecord.provider == _normalize_text(provider, "provider")
+            )
+        if adjusted is not None:
+            statement = statement.where(IndicatorSnapshotRecord.adjusted == adjusted)
+        if calculation_version is not None:
+            statement = statement.where(
+                IndicatorSnapshotRecord.calculation_version
+                == _normalize_text(calculation_version, "calculation_version")
+            )
+        statement = statement.order_by(
+            IndicatorSnapshotRecord.calculation_date.desc(),
+            IndicatorSnapshotRecord.calculated_at.desc(),
+            IndicatorSnapshotRecord.id.desc(),
+        )
+
+        return self._session.scalar(statement)
+
+    def get_latest_for_version(
+        self,
+        symbol: str,
+        calculation_version: str,
+        *,
+        provider: str | None = None,
+        adjusted: bool | None = True,
+    ) -> IndicatorSnapshotRecord | None:
+        """Return the latest indicator snapshot for one calculation version."""
+        return self.get_latest(
+            symbol,
+            provider=provider,
+            adjusted=adjusted,
+            calculation_version=calculation_version,
+        )
 
 
 class IngestionRunRepository:
@@ -384,6 +508,7 @@ def _validate_non_negative_count(value: int, field_name: str) -> None:
 
 __all__ = [
     "DailyCandleRepository",
+    "IndicatorSnapshotRepository",
     "IngestionRunNotFoundError",
     "IngestionRunRepository",
     "PersistenceError",
