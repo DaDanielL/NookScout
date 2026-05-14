@@ -1,6 +1,6 @@
 # Scoring Methodology
 
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 This document is the canonical MVP reference for rules that determine which tickers and
 future setup ideas NookScout surfaces or suppresses. It documents educational research
@@ -9,7 +9,7 @@ execution guidance, personalized financial advice, or a promise of any outcome.
 
 ## Current Implementation Status
 
-Implemented by STORY-005, STORY-008, and STORY-009:
+Implemented by STORY-005, STORY-008, STORY-009, STORY-010, and STORY-011:
 
 - Configurable predefined universe symbols.
 - Configurable liquidity filters for Scout Mode universe eligibility.
@@ -17,6 +17,9 @@ Implemented by STORY-005, STORY-008, and STORY-009:
 - Deterministic core technical indicators from normalized completed daily candles:
   SMA, RSI, MACD, ATR, and relative volume.
 - Deterministic support/resistance zones and benchmark-relative strength signals.
+- Versioned persisted indicator snapshots from cached daily candles.
+- Typed setup scoring schemas and version contracts for future setup ideas, chart
+  levels, risk/reward, confidence factors, signal explanations, and failure conditions.
 
 Decided by STORY-007:
 
@@ -30,8 +33,8 @@ Decided by STORY-007:
 Planned, not implemented:
 
 - Trend and setup classification.
-- Setup scoring, ranking, tie-breaking, confidence labels, no-clear-setup decisions,
-  entry zone, invalidation area, target area, and risk/reward estimates.
+- Setup scoring, ranking, tie-breaking, confidence calibration, level derivation, and
+  no-clear-setup decision rules.
 - LLM-generated rationale.
 
 ## Ticker Eligibility and Universe Source
@@ -420,6 +423,45 @@ Future setup scoring should store the scoring version that consumed an indicator
 alongside setup ideas, so old ideas can be interpreted against both indicator and scoring
 logic versions.
 
+## Shared Setup Idea Contract
+
+STORY-011 introduces the first setup scoring domain contracts in
+`app/scoring/models.py`. These contracts define the shared shape that future scoring,
+persistence, API responses, UI cards, chart overlays, and LLM rationale inputs should
+use. They do not implement setup scoring, ranking, classification, or level derivation.
+
+Every setup idea carries version metadata:
+
+- `scoring-v1` for deterministic setup scoring contracts.
+- `rationale-v1` for future structured rationale payloads.
+
+Setup labels cover bullish long research ideas and wait states:
+
+- `bullish_breakout`
+- `bullish_pullback`
+- `bullish_continuation`
+- `no_clear_setup`
+- `avoid_wait`
+- `incomplete_data`
+
+Bullish trade-plan setup ideas must include a complete `SetupTradePlan` with:
+
+- Entry zone.
+- Stop / invalidation level.
+- Target zone.
+- Risk/reward estimate.
+- Expected holding window, defaulting to 3 to 20 trading days.
+- At least one failure condition.
+
+`No Clear Setup`, `Avoid / Wait`, and incomplete-data outputs must not include trade-plan
+levels. They must include explicit reason text so downstream UI and rationale generation
+can explain why no trade-plan setup was produced.
+
+Setup level contracts include enough structure for later chart overlays: level kind,
+label, point price and/or zone bounds, source, and display order. The schemas validate
+that zones are coherent and that a representative price, when supplied, sits inside its
+zone.
+
 ## Future Trend and Setup Classification
 
 Planned, not implemented.
@@ -430,7 +472,7 @@ rather than being forced into a setup category.
 
 ## Future Scoring, Ranking, and Levels
 
-Planned, not implemented.
+Planned, not implemented beyond the shared setup idea schemas described above.
 
 Future scoring rules should define ranking factors, tie-breaking, confidence labels,
 no-clear-setup behavior, entry zone, invalidation area, target area, risk/reward estimate,

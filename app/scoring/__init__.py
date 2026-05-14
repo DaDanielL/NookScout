@@ -1,0 +1,41 @@
+"""Setup scoring domain contracts."""
+
+from app.scoring.models import (
+    RATIONALE_VERSION,
+    SCORING_VERSION,
+    TRADE_PLAN_LABELS,
+    ConfidenceFactor,
+    ConfidenceLabel,
+    ExpectedHoldingWindow,
+    FailureCondition,
+    RiskRewardEstimate,
+    SetupIdea,
+    SetupLabel,
+    SetupLevel,
+    SetupLevelKind,
+    SetupScoringInput,
+    SetupTradePlan,
+    SignalCategory,
+    SignalExplanation,
+    SignalPolarity,
+)
+
+__all__ = [
+    "RATIONALE_VERSION",
+    "SCORING_VERSION",
+    "TRADE_PLAN_LABELS",
+    "ConfidenceFactor",
+    "ConfidenceLabel",
+    "ExpectedHoldingWindow",
+    "FailureCondition",
+    "RiskRewardEstimate",
+    "SetupIdea",
+    "SetupLabel",
+    "SetupLevel",
+    "SetupLevelKind",
+    "SetupScoringInput",
+    "SetupTradePlan",
+    "SignalCategory",
+    "SignalExplanation",
+    "SignalPolarity",
+]
