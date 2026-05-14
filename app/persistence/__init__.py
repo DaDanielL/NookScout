@@ -2,6 +2,7 @@
 
 from app.persistence.models import (
     DailyCandleRecord,
+    IndicatorSnapshotRecord,
     IngestionRunRecord,
     IngestionRunStatus,
     IngestionRunType,
@@ -10,6 +11,7 @@ from app.persistence.models import (
 )
 from app.persistence.repositories import (
     DailyCandleRepository,
+    IndicatorSnapshotRepository,
     IngestionRunNotFoundError,
     IngestionRunRepository,
     PersistenceError,
@@ -20,6 +22,8 @@ from app.persistence.repositories import (
 __all__ = [
     "DailyCandleRecord",
     "DailyCandleRepository",
+    "IndicatorSnapshotRecord",
+    "IndicatorSnapshotRepository",
     "IngestionRunNotFoundError",
     "IngestionRunRecord",
     "IngestionRunRepository",

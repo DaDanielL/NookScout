@@ -349,9 +349,11 @@ and excluded from deterministic scoring unless the scoring methodology is update
 
 ## Indicator Signal Coverage
 
-The MVP indicator layer should consume provider-neutral `DailyCandle`, `Quote`, cached
-benchmark candles, and future persisted indicator snapshots. Indicator code should not
-call provider APIs directly or depend on provider-specific response shapes.
+The MVP indicator layer consumes provider-neutral `DailyCandle`, `Quote`, cached
+benchmark candles, and persisted indicator snapshots. Indicator code should not call
+provider APIs directly or depend on provider-specific response shapes. The indicator
+snapshot refresh pipeline is provider-free: it reads cached daily candles through
+repositories, computes deterministic snapshots, and writes versioned persistence records.
 
 | Signal | MVP owner | Primary inputs | Provider indicator policy | Follow-up implementation notes |
 |--------|-----------|----------------|---------------------------|--------------------------------|
@@ -389,10 +391,34 @@ Expected assertion policy:
   raw pandas/NumPy calculation internals unless those internals intentionally use
   Decimal.
 
-Future persisted indicator snapshots should record calculation version, ticker, provider
-for the source candles, input candle range, adjusted/unadjusted status, benchmark symbols
-and windows for relative strength, incomplete-data flags, and the scoring version that
-consumed the snapshot.
+## Persisted Indicator Snapshots
+
+STORY-010 implements persisted indicator snapshots with calculation version
+`indicator-v1`. Each refresh writes a new immutable `indicator_snapshots` row instead of
+upserting, so reruns with corrected cached candles preserve reproducibility evidence.
+
+Snapshot records persist:
+
+- Ticker symbol, source-candle provider, calculation date, and timezone-aware
+  `calculated_at`.
+- Input candle start/end dates, adjusted/unadjusted status, data recency, available
+  candle count, and required candle count.
+- Calculation version, complete/incomplete flags for the combined snapshot and each
+  payload section.
+- JSON payloads for technical indicators, support/resistance, and relative strength.
+- Benchmark symbols and relative-strength lookback windows.
+- Section-tagged incomplete details, including missing benchmark data and insufficient
+  history states.
+
+The refresh service uses cached candles only. Missing benchmark candles are persisted as
+relative-strength incomplete details rather than treated as ticker refresh failures.
+Per-symbol refresh failures should be logged with ticker, provider, calculation date, and
+calculation version while omitting secrets, authorization headers, API keys, and database
+URLs.
+
+Future setup scoring should store the scoring version that consumed an indicator snapshot
+alongside setup ideas, so old ideas can be interpreted against both indicator and scoring
+logic versions.
 
 ## Future Trend and Setup Classification
 
